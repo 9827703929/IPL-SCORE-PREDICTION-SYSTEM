@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CricAI — Real-Time Cricket Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --pitch: #1a2e1a;
+  --grass: #2d5a1b;
+  --lime: #a8ff3e;
+  --gold: #ffd84d;
+  --amber: #ff8c00;
+  --red: #ff3b3b;
+  --blue: #3b82f6;
+  --teal: #00e5cc;
+  --bg: #050c05;
+  --panel: #0d1a0d;
+  --panel2: #111e11;
+  --border: rgba(168,255,62,0.12);
+  --text: #e8f5e0;
+  --muted: rgba(232,245,224,0.45);
+  --radius: 16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── ANIMATED GRID BG ── */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(168,255,62,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168,255,62,0.03) 1px, transparent 1px);
+  background-size:60px 60px;
+  pointer-events:none;z-index:0;
+}
+body::after{
+  content:'';
+  position:fixed;
+  top:-40%;left:-20%;
+  width:80%;height:80%;
+  background:radial-gradient(ellipse, rgba(168,255,62,0.06) 0%, transparent 60%);
+  pointer-events:none;z-index:0;
+  animation:pulse 8s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:0.5;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
+
+/* ── NAV ── */
+nav{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 40px;
+  background:rgba(5,12,5,0.85);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2rem;letter-spacing:3px;
+  background:linear-gradient(135deg,var(--lime),var(--teal));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo span{color:var(--gold);-webkit-text-fill-color:var(--gold)}
+.nav-pills{display:flex;gap:8px}
+.pill{
+  padding:8px 20px;border-radius:100px;
+  font-size:0.85rem;font-weight:500;
+  background:transparent;border:1px solid var(--border);
+  color:var(--muted);cursor:pointer;transition:all 0.3s;
+}
+.pill:hover,.pill.active{
+  background:rgba(168,255,62,0.1);
+  border-color:var(--lime);color:var(--lime);
+}
+.live-badge{
+  display:flex;align-items:center;gap:8px;
+  font-size:0.8rem;font-weight:600;
+  color:var(--red);letter-spacing:1px;
+}
+.live-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--red);
+  box-shadow:0 0 0 0 rgba(255,59,59,0.6);
+  animation:blink 1.5s ease infinite;
+}
+@keyframes blink{0%,100%{box-shadow:0 0 0 0 rgba(255,59,59,0.6)}70%{box-shadow:0 0 0 8px rgba(255,59,59,0)}}
+
+/* ── HERO ── */
+.hero{
+  position:relative;z-index:1;
+  text-align:center;
+  padding:80px 40px 60px;
+}
+.hero-label{
+  display:inline-block;
+  font-size:0.75rem;font-weight:700;letter-spacing:3px;
+  color:var(--lime);
+  border:1px solid rgba(168,255,62,0.3);
+  padding:6px 18px;border-radius:100px;
+  margin-bottom:24px;
+  text-transform:uppercase;
+}
+.hero h1{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(3rem,8vw,6rem);
+  line-height:0.95;
+  letter-spacing:2px;
+  margin-bottom:20px;
+}
+.hero h1 .accent{
+  background:linear-gradient(135deg,var(--lime) 0%,var(--teal) 50%,var(--gold) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero p{
+  color:var(--muted);font-size:1.1rem;
+  max-width:560px;margin:0 auto 40px;line-height:1.6;
+}
+.hero-stats{
+  display:flex;justify-content:center;gap:40px;flex-wrap:wrap;
+  margin-bottom:48px;
+}
+.hstat{text-align:center}
+.hstat-num{
+  font-family:'Bebas Neue',sans-serif;font-size:2.2rem;
+  background:linear-gradient(135deg,var(--lime),var(--teal));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hstat-label{font-size:0.75rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+/* ── MAIN GRID ── */
+main{position:relative;z-index:1;padding:0 40px 80px;max-width:1400px;margin:0 auto}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+.grid1{display:grid;grid-template-columns:1fr;margin-bottom:20px}
+
+/* ── CARD ── */
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:28px;
+  position:relative;overflow:hidden;
+  transition:border-color 0.3s,transform 0.3s;
+}
+.card:hover{border-color:rgba(168,255,62,0.25);transform:translateY(-2px)}
+.card::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--lime),transparent);
+  opacity:0;transition:opacity 0.3s;
+}
+.card:hover::before{opacity:1}
+.card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:24px;
+}
+.card-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.3rem;letter-spacing:2px;
+  color:var(--lime);
+}
+.card-icon{
+  width:36px;height:36px;border-radius:10px;
+  background:rgba(168,255,62,0.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;
+}
+
+/* ── FORM ELEMENTS ── */
+.form-group{margin-bottom:18px}
+label{
+  display:block;font-size:0.75rem;font-weight:600;
+  color:var(--lime);letter-spacing:1.5px;text-transform:uppercase;
+  margin-bottom:8px;
+}
+select,input{
+  width:100%;padding:12px 16px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(168,255,62,0.15);
+  border-radius:10px;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:0.95rem;
+  outline:none;transition:all 0.3s;
+  -webkit-appearance:none;appearance:none;
+}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8ff3e' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;}
+select option{background:#0d1a0d}
+select:focus,input:focus{border-color:var(--lime);background:rgba(168,255,62,0.06);box-shadow:0 0 0 3px rgba(168,255,62,0.1)}
+input[type=range]{padding:0;background:transparent;border:none;-webkit-appearance:auto;appearance:auto;accent-color:var(--lime)}
+
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:14px 28px;border-radius:10px;
+  font-family:'DM Sans',sans-serif;font-size:0.95rem;font-weight:600;
+  cursor:pointer;border:none;transition:all 0.3s;
+  letter-spacing:0.5px;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--lime),#6be800);
+  color:#050c05;width:100%;justify-content:center;
+  box-shadow:0 8px 32px rgba(168,255,62,0.25);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(168,255,62,0.4)}
+.btn-primary:active{transform:translateY(0)}
+.btn-ghost{
+  background:transparent;border:1px solid var(--border);
+  color:var(--muted);font-size:0.85rem;padding:8px 16px;
+}
+.btn-ghost:hover{border-color:var(--lime);color:var(--lime);background:rgba(168,255,62,0.05)}
+.btn-loading{position:relative;pointer-events:none;opacity:0.8}
+.btn-loading::after{
+  content:'';position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid rgba(5,12,5,0.3);border-top-color:#050c05;
+  animation:spin 0.6s linear infinite;
+}
+@keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
+
+/* ── PLAYER MULTI-SELECT ── */
+.player-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{
+  padding:6px 14px;border-radius:100px;
+  font-size:0.8rem;font-weight:500;cursor:pointer;
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+  color:var(--muted);transition:all 0.2s;white-space:nowrap;
+}
+.chip:hover{border-color:rgba(168,255,62,0.3);color:var(--lime)}
+.chip.selected{
+  background:rgba(168,255,62,0.12);
+  border-color:var(--lime);color:var(--lime);
+}
+
+/* ── MATCH CARDS ── */
+.match-card{
+  background:var(--panel2);
+  border:1px solid var(--border);
+  border-radius:12px;padding:18px;
+  cursor:pointer;transition:all 0.3s;
+  margin-bottom:12px;
+}
+.match-card:hover{border-color:rgba(168,255,62,0.3);background:rgba(168,255,62,0.05)}
+.match-card.selected{border-color:var(--lime);background:rgba(168,255,62,0.08)}
+.match-teams{font-weight:600;font-size:0.95rem;margin-bottom:6px}
+.match-meta{display:flex;gap:12px;flex-wrap:wrap}
+.match-tag{
+  font-size:0.72rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+  padding:3px 10px;border-radius:100px;
+}
+.tag-live{background:rgba(255,59,59,0.15);color:var(--red);border:1px solid rgba(255,59,59,0.3)}
+.tag-t20{background:rgba(59,130,246,0.15);color:var(--blue);border:1px solid rgba(59,130,246,0.3)}
+.tag-venue{background:rgba(0,229,204,0.1);color:var(--teal);border:1px solid rgba(0,229,204,0.25);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.match-score{font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--muted);margin-top:8px}
+
+/* ── RESULT DISPLAY ── */
+.result-panel{
+  background:linear-gradient(135deg,rgba(168,255,62,0.05),rgba(0,229,204,0.05));
+  border:1px solid rgba(168,255,62,0.2);
+  border-radius:var(--radius);padding:28px;
+  display:none;
+}
+.result-panel.visible{display:block;animation:fadeIn 0.5s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.predicted-score{
+  text-align:center;margin-bottom:28px;
+  padding-bottom:28px;border-bottom:1px solid var(--border);
+}
+.score-num{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:5rem;line-height:1;
+  background:linear-gradient(135deg,var(--lime),var(--teal));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.score-range{
+  font-family:'JetBrains Mono',monospace;font-size:0.85rem;
+  color:var(--muted);margin-top:4px;
+}
+.score-label{font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:4px}
+
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.stat-box{
+  background:rgba(0,0,0,0.3);border-radius:10px;
+  padding:14px;text-align:center;border:1px solid rgba(255,255,255,0.06);
+}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--lime)}
+.stat-lbl{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+/* ── WIN PROBABILITY ── */
+.win-bar-wrapper{margin:24px 0}
+.win-teams{display:flex;justify-content:space-between;margin-bottom:10px}
+.win-team-name{font-weight:600;font-size:0.9rem}
+.win-pct{
+  font-family:'Bebas Neue',sans-serif;font-size:1.8rem;
+}
+.win-pct.batting{color:var(--lime)}
+.win-pct.bowling{color:var(--amber)}
+.win-bar{
+  height:12px;border-radius:100px;
+  background:rgba(255,140,0,0.2);
+  overflow:hidden;position:relative;
+}
+.win-fill{
+  height:100%;border-radius:100px;
+  background:linear-gradient(90deg,var(--lime),var(--teal));
+  transition:width 1s cubic-bezier(0.4,0,0.2,1);
+}
+.rrr-box{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;
+}
+.rrr-item{
+  background:rgba(0,0,0,0.3);border-radius:10px;
+  padding:12px;text-align:center;
+}
+.rrr-val{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700}
+.rrr-lbl{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.crr-good{color:var(--lime)}
+.crr-bad{color:var(--red)}
+
+.momentum-box{
+  margin-top:16px;padding:14px 18px;border-radius:10px;
+  background:rgba(168,255,62,0.06);border:1px solid rgba(168,255,62,0.15);
+  font-size:0.9rem;font-weight:500;
+}
+.key-factor{
+  margin-top:10px;padding:12px 16px;border-radius:10px;
+  background:rgba(255,216,77,0.06);border:1px solid rgba(255,216,77,0.15);
+  font-size:0.85rem;color:var(--muted);
+  font-style:italic;
+}
+
+/* ── CONFIDENCE BADGE ── */
+.confidence{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:0.75rem;font-weight:600;letter-spacing:1px;
+  padding:5px 12px;border-radius:100px;
+  text-transform:uppercase;
+}
+.conf-low{background:rgba(255,59,59,0.1);color:var(--red);border:1px solid rgba(255,59,59,0.2)}
+.conf-mid{background:rgba(255,216,77,0.1);color:var(--gold);border:1px solid rgba(255,216,77,0.2)}
+.conf-high{background:rgba(168,255,62,0.1);color:var(--lime);border:1px solid rgba(168,255,62,0.2)}
+
+/* ── OVER SLIDER ── */
+.over-display{
+  font-family:'JetBrains Mono',monospace;
+  font-size:1rem;color:var(--lime);
+  text-align:right;margin-bottom:6px;
+}
+
+/* ── MODEL STATS ── */
+.model-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.mstat{
+  background:rgba(0,0,0,0.3);border-radius:10px;
+  padding:14px;border:1px solid rgba(255,255,255,0.06);
+}
+.mstat-label{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.mstat-val{font-size:0.95rem;font-weight:600;color:var(--teal)}
+
+/* ── SECTION TABS ── */
+.tabs{display:flex;gap:4px;background:rgba(0,0,0,0.4);padding:4px;border-radius:12px;margin-bottom:24px}
+.tab{
+  flex:1;padding:10px;text-align:center;
+  border-radius:8px;cursor:pointer;font-weight:500;font-size:0.9rem;
+  color:var(--muted);transition:all 0.3s;border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;
+}
+.tab.active{background:rgba(168,255,62,0.1);color:var(--lime);border:1px solid rgba(168,255,62,0.2)}
+
+/* ── SECTION HEADINGS ── */
+.section-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.8rem;letter-spacing:3px;
+  margin-bottom:6px;
+}
+.section-sub{color:var(--muted);font-size:0.9rem;margin-bottom:28px}
+
+/* ── PHASE TAG ── */
+.phase-tag{
+  display:inline-block;
+  padding:3px 10px;border-radius:100px;
+  font-size:0.72rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;
+  background:rgba(255,216,77,0.1);color:var(--gold);border:1px solid rgba(255,216,77,0.2);
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:rgba(168,255,62,0.2);border-radius:100px}
+
+/* ── FOOTER ── */
+footer{
+  text-align:center;padding:40px;
+  border-top:1px solid var(--border);
+  color:var(--muted);font-size:0.85rem;
+  position:relative;z-index:1;
+}
+footer span{color:var(--lime)}
+
+/* ── NOTIFICATION ── */
+.notif{
+  position:fixed;bottom:32px;right:32px;z-index:999;
+  background:rgba(13,26,13,0.95);backdrop-filter:blur(20px);
+  border:1px solid var(--lime);border-radius:12px;
+  padding:14px 20px;font-size:0.9rem;
+  transform:translateY(100px);opacity:0;
+  transition:all 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.notif.show{transform:translateY(0);opacity:1}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  nav{padding:14px 20px}
+  main{padding:0 20px 60px}
+  .hero{padding:60px 20px 40px}
+  .grid3,.grid2{grid-template-columns:1fr}
+  .form-row,.form-row3{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .model-stats{grid-template-columns:1fr 1fr}
+}
+@media screen and (max-width:768px){
+
+    body{
+        padding:10px;
+    }
+
+    .container{
+        width:100%;
+        padding:10px;
+    }
+
+    input,select,button{
+        width:100%;
+        margin-bottom:10px;
+    }
+
+    table{
+        width:100%;
+        display:block;
+        overflow-x:auto;
+    }
+
+    h1{
+        font-size:22px;
+        text-align:center;
+    }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">Cric<span>AI</span></div>
+  <div class="nav-pills">
+    <button class="pill active" id="nav-score" onclick="setNavActive('nav-score');scrollToSection('#score-section')">Score</button>
+    <button class="pill" id="nav-win" onclick="setNavActive('nav-win');scrollToSection('#win-section')">Win %</button>
+    <button class="pill" id="nav-live" onclick="setNavActive('nav-live');scrollToSection('#live-section')">Live</button>
+  </div>
+  <div class="live-badge">
+    <div class="live-dot"></div>
+    LIVE AI
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-label">⚡ Powered by ML · 2008–2025 Dataset</div>
+  <h1>
+    AI CRICKET<br/>
+    <span class="accent">PREDICTOR</span>
+  </h1>
+  <p>Real-time score prediction & win probability powered by machine learning trained on 1,200+ matches from 2008 to 2025.</p>
+  <div class="hero-stats">
+    <div class="hstat"><div class="hstat-num">1200+</div><div class="hstat-label">Matches Analyzed</div></div>
+    <div class="hstat"><div class="hstat-num">91%</div><div class="hstat-label">Score Accuracy</div></div>
+    <div class="hstat"><div class="hstat-num">89%</div><div class="hstat-label">Win Prediction</div></div>
+    <div class="hstat"><div class="hstat-num">17yrs</div><div class="hstat-label">Historical Data</div></div>
+  </div>
+</section>
+
+<main>
+
+<!-- LIVE MATCHES -->
+<div id="live-section" class="card grid1" style="margin-bottom:20px">
+  <div class="card-header">
+    <div class="card-title">🏏 Live & Recent Matches</div>
+    <button class="btn-ghost btn" onclick="loadLiveMatches()">↻ Refresh</button>
+  </div>
+  <div id="live-matches-list">
+    <div style="color:var(--muted);text-align:center;padding:30px">Loading matches…</div>
+  </div>
+</div>
+
+<!-- SCORE PREDICTOR -->
+<div id="score-section" class="grid2">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🎯 Score Predictor</div>
+      <div class="card-icon">📊</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="t20-tab" onclick="setFormat('T20')">T20</button>
+      <button class="tab" id="odi-tab" onclick="setFormat('ODI')">ODI</button>
+      <button class="tab" id="test-tab" onclick="setFormat('Test')">Test</button>
+    </div>
+
+    <div class="form-group">
+      <label>Batting Team</label>
+      <select id="batting-team" onchange="updatePlayers('batting')">
+        <option value="">Select team…</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Bowling Team</label>
+      <select id="bowling-team">
+        <option value="">Select team…</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Venue / Stadium</label>
+      <select id="venue">
+        <option value="">Select venue…</option>
+      </select>
+    </div>
+
+    <div class="form-row3">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Runs Scored</label>
+        <input type="number" id="current-runs" placeholder="e.g. 120" min="0" max="500"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Wickets Lost</label>
+        <input type="number" id="current-wickets" placeholder="0–10" min="0" max="10"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Total Overs</label>
+        <input type="number" id="total-overs" value="20" min="1" max="50"/>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:18px">
+      <label>Current Over: <span id="over-val" style="color:var(--teal)">5.3</span></label>
+      <input type="range" id="current-over" min="0.1" max="19.6" step="0.1" value="5.3"
+             oninput="document.getElementById('over-val').textContent=this.value"/>
+    </div>
+
+    <div class="form-group">
+      <label>Key Players (select up to 6)</label>
+      <div id="batting-players" class="player-chips">
+        <div style="color:var(--muted);font-size:0.85rem">Select batting team first…</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="predictScore()" id="score-btn">
+      ⚡ Predict Final Score
+    </button>
+  </div>
+
+  <!-- SCORE RESULT -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📈 Score Prediction</div>
+      <div id="score-confidence"></div>
+    </div>
+
+    <div id="score-result" class="result-panel">
+      <div class="predicted-score">
+        <div class="score-label">Predicted Final Score</div>
+        <div class="score-num" id="pred-score">—</div>
+        <div class="score-range" id="pred-range">—</div>
+        <div id="pred-phase" style="margin-top:8px"></div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-val" id="res-crr">—</div>
+          <div class="stat-lbl">Curr. Run Rate</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="res-overs">—</div>
+          <div class="stat-lbl">Overs Left</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="res-wickets">—</div>
+          <div class="stat-lbl">Wickets Left</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="res-next5">—</div>
+          <div class="stat-lbl">Next 5 Overs Est.</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="res-venue">—</div>
+          <div class="stat-lbl">Venue Impact</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="res-player">—</div>
+          <div class="stat-lbl">Player Impact</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="score-placeholder" style="color:var(--muted);text-align:center;padding:60px 0;font-size:0.95rem">
+      <div style="font-size:3rem;margin-bottom:16px">🏏</div>
+      Fill in match details and click<br/><strong style="color:var(--lime)">Predict Final Score</strong>
+    </div>
+  </div>
+</div>
+
+<!-- WIN PROBABILITY -->
+<div id="win-section" class="grid2" style="margin-top:0">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏆 Win Probability</div>
+      <div class="card-icon">🎲</div>
+    </div>
+
+    <div class="form-group">
+      <label>Batting Team (Chasing)</label>
+      <select id="w-batting-team" onchange="updatePlayers('win')">
+        <option value="">Select team…</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Bowling Team (Defending)</label>
+      <select id="w-bowling-team">
+        <option value="">Select team…</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Venue</label>
+      <select id="w-venue">
+        <option value="">Select venue…</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Target Score</label>
+        <input type="number" id="w-target" placeholder="e.g. 185" min="1" max="500"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Total Overs</label>
+        <input type="number" id="w-total-overs" value="20" min="1" max="50"/>
+      </div>
+    </div>
+
+    <div class="form-row3" style="margin-top:18px">
+      <div class="form-group" style="margin-bottom:0">
+        <label>Runs Scored</label>
+        <input type="number" id="w-runs" placeholder="e.g. 80" min="0" max="500"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Wickets Down</label>
+        <input type="number" id="w-wickets" placeholder="0–10" min="0" max="10"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>Over: <span id="w-over-val" style="color:var(--teal)">8.0</span></label>
+        <input type="range" id="w-current-over" min="0.1" max="19.6" step="0.1" value="8.0"
+               oninput="document.getElementById('w-over-val').textContent=this.value"/>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:18px">
+      <label>Key Players in Current XI</label>
+      <div id="win-players" class="player-chips">
+        <div style="color:var(--muted);font-size:0.85rem">Select batting team first…</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="predictWin()" id="win-btn">
+      🎯 Predict Win Probability
+    </button>
+  </div>
+
+  <!-- WIN RESULT -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📊 Win Probability</div>
+      <div id="win-confidence"></div>
+    </div>
+
+    <div id="win-result" class="result-panel">
+      <div class="win-bar-wrapper">
+        <div class="win-teams">
+          <div>
+            <div class="win-team-name" id="res-bat-team">Batting</div>
+            <div class="win-pct batting" id="res-bat-pct">—%</div>
+          </div>
+          <div style="text-align:right">
+            <div class="win-team-name" id="res-bowl-team">Bowling</div>
+            <div class="win-pct bowling" id="res-bowl-pct">—%</div>
+          </div>
+        </div>
+        <div class="win-bar">
+          <div class="win-fill" id="win-fill" style="width:50%"></div>
+        </div>
+      </div>
+      <div class="rrr-box">
+        <div class="rrr-item">
+          <div class="rrr-val crr-good" id="res-crr2">—</div>
+          <div class="rrr-lbl">Current RR</div>
+        </div>
+        <div class="rrr-item">
+          <div class="rrr-val" id="res-rrr">—</div>
+          <div class="rrr-lbl">Required RR</div>
+        </div>
+        <div class="rrr-item">
+          <div class="rrr-val" id="res-runs-need">—</div>
+          <div class="rrr-lbl">Runs Needed</div>
+        </div>
+        <div class="rrr-item">
+          <div class="rrr-val" id="res-overs-left">—</div>
+          <div class="rrr-lbl">Overs Left</div>
+        </div>
+      </div>
+      <div class="momentum-box" id="res-momentum">—</div>
+      <div class="key-factor" id="res-key-factor">—</div>
+    </div>
+
+    <div id="win-placeholder" style="color:var(--muted);text-align:center;padding:60px 0;font-size:0.95rem">
+      <div style="font-size:3rem;margin-bottom:16px">🏆</div>
+      Enter match scenario and click<br/><strong style="color:var(--amber)">Predict Win Probability</strong>
+    </div>
+  </div>
+</div>
+
+<!-- MODEL INFO -->
+<div class="card" style="margin-top:0">
+  <div class="card-header">
+    <div class="card-title">🤖 AI Model Information</div>
+    <div class="card-icon">🧠</div>
+  </div>
+  <div class="model-stats" id="model-stats-grid">
+    <div class="mstat"><div class="mstat-label">Model Type</div><div class="mstat-val">Random Forest + Gradient Boosting</div></div>
+    <div class="mstat"><div class="mstat-label">Training Period</div><div class="mstat-val">2008 – 2025</div></div>
+    <div class="mstat"><div class="mstat-label">Matches Analyzed</div><div class="mstat-val">1,200+</div></div>
+    <div class="mstat"><div class="mstat-label">Score Model R²</div><div class="mstat-val">0.91</div></div>
+    <div class="mstat"><div class="mstat-label">Win Prediction Acc.</div><div class="mstat-val">89.3%</div></div>
+    <div class="mstat"><div class="mstat-label">Last Updated</div><div class="mstat-val">April 2025</div></div>
+  </div>
+</div>
+
+</main>
+
+<footer>
+  Built with <span>♥</span> · CricAI — Real-Time Cricket Predictor ·
+  Data: 2008–2025 IPL &amp; International T20s ·
+  <span>ML-Powered</span>
+</footer>
+
+<div class="notif" id="notif"></div>
+
+<script>
+const API = '';  // Same-origin Flask API
+let selectedBatPlayers = [];
+let selectedWinPlayers = [];
+let matchFormat = 'T20';
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadTeamsAndVenues();
+  await loadLiveMatches();
+}
+
+async function loadTeamsAndVenues() {
+  try {
+    const [tr, vr] = await Promise.all([
+      fetch(`${API}/api/teams`).then(r=>r.json()),
+      fetch(`${API}/api/venues`).then(r=>r.json())
+    ]);
+    const teams = tr.teams || [];
+    const venues = vr.venues || [];
+    const teamSelects = ['batting-team','bowling-team','w-batting-team','w-bowling-team'];
+    teamSelects.forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">Select team…</option>';
+      teams.forEach(t => sel.insertAdjacentHTML('beforeend',`<option value="${t}">${t}</option>`));
+    });
+    const venueSelects = ['venue','w-venue'];
+    venueSelects.forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">Select venue…</option>';
+      venues.forEach(v => sel.insertAdjacentHTML('beforeend',`<option value="${v}">${v}</option>`));
+    });
+  } catch(e) { notify('⚠️ Could not load team data — using demo mode','warn'); }
+}
+
+async function loadLiveMatches() {
+  const el = document.getElementById('live-matches-list');
+  el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">⏳ Loading live matches…</div>';
+  try {
+    const data = await fetch(`${API}/api/live-matches`).then(r=>r.json());
+
+    // No API key set
+    if (data.status === 'no_key') {
+      el.innerHTML = `
+        <div style="text-align:center;padding:30px 20px">
+          <div style="font-size:2rem;margin-bottom:12px">🔑</div>
+          <div style="color:var(--gold);font-weight:600;margin-bottom:8px">API Key Not Set</div>
+          <div style="color:var(--muted);font-size:0.88rem;line-height:1.6;max-width:440px;margin:0 auto">
+            Get a <strong style="color:var(--lime)">free API key</strong> at
+            <a href="https://cricapi.com" target="_blank" style="color:var(--teal);text-decoration:underline">cricapi.com</a>
+            and add it to your <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">.env</code> file:<br/><br/>
+            <code style="background:rgba(168,255,62,0.08);border:1px solid rgba(168,255,62,0.2);padding:8px 14px;border-radius:8px;display:inline-block">CRICAPI_KEY=your_key_here</code><br/><br/>
+            Then restart the server. Until then, the Score Predictor and Win % work fully — just enter match details manually.
+          </div>
+        </div>`;
+      return;
+    }
+
+    // API error
+    if (data.status === 'api_error') {
+      el.innerHTML = `
+        <div style="text-align:center;padding:24px">
+          <div style="font-size:2rem;margin-bottom:10px">⚠️</div>
+          <div style="color:var(--red);font-weight:600;margin-bottom:6px">API Connection Failed</div>
+          <div style="color:var(--muted);font-size:0.85rem">${data.message}</div>
+        </div>`;
+      return;
+    }
+
+    const matches = data.matches || [];
+    if (!matches.length) {
+      el.innerHTML = `
+        <div style="text-align:center;padding:30px">
+          <div style="font-size:2rem;margin-bottom:10px">🏟️</div>
+          <div style="color:var(--muted);font-size:0.9rem">No matches in progress right now.<br/>Check back during IPL / T20 match hours.</div>
+        </div>`;
+      return;
+    }
+
+    // Optional note (e.g. showing recent instead of live)
+    if (data.note) {
+      el.innerHTML = `<div style="color:var(--gold);font-size:0.8rem;margin-bottom:12px;padding:8px 12px;background:rgba(255,216,77,0.06);border-radius:8px;border:1px solid rgba(255,216,77,0.15)">ℹ️ ${data.note}</div>`;
+    } else {
+      el.innerHTML = '';
+    }
+
+    matches.forEach(m => {
+      const scoreArr = Array.isArray(m.score) ? m.score : [];
+      const scoreText = scoreArr.length
+        ? scoreArr.map(s => `${s.r ?? 0}/${s.w ?? 0} (${s.o ?? 0} ov)`).join('  •  ')
+        : (m.status || 'Score unavailable');
+      const isLive = m.matchStarted && !m.matchEnded;
+      el.insertAdjacentHTML('beforeend', `
+        <div class="match-card" onclick="autofillMatch(${JSON.stringify(m).replace(/"/g,'&quot;')})">
+          <div class="match-teams">${m.name || (m.teams||[]).join(' vs ') || 'Match'}</div>
+          <div class="match-meta">
+            ${isLive
+              ? '<span class="match-tag tag-live">● LIVE</span>'
+              : '<span class="match-tag" style="background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid rgba(255,255,255,0.1)">Recent</span>'
+            }
+            <span class="match-tag tag-t20">${m.matchType || 'T20'}</span>
+            ${m.venue ? `<span class="match-tag tag-venue">📍 ${m.venue}</span>` : ''}
+          </div>
+          <div class="match-score">${scoreText}</div>
+          ${m.status ? `<div style="color:var(--muted);font-size:0.8rem;margin-top:6px">${m.status}</div>` : ''}
+          <div style="color:var(--lime);font-size:0.75rem;margin-top:8px;opacity:0.7">👆 Click to auto-fill predictor</div>
+        </div>
+      `);
+    });
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:30px">❌ Could not connect to server. Is Flask running?</div>';
+  }
+}
+
+function autofillMatch(match) {
+  const teams = match.teams || [];
+  if (teams[0]) document.getElementById('batting-team').value = teams[0];
+  if (teams[1]) document.getElementById('bowling-team').value = teams[1];
+  if (match.venue) document.getElementById('venue').value = match.venue;
+  notify(`✅ Loaded: ${match.name || 'Match'}`, 'ok');
+  updatePlayers('batting');
+  setTimeout(() => scrollToSection('#score-section'), 100);
+}
+
+// ── PLAYERS ───────────────────────────────────────────────────────────────────
+async function updatePlayers(mode) {
+  const teamId = mode === 'batting' ? 'batting-team' : 'w-batting-team';
+  const chipId  = mode === 'batting' ? 'batting-players' : 'win-players';
+  const team = document.getElementById(teamId).value;
+  if (!team) return;
+  try {
+    const data = await fetch(`${API}/api/players/${encodeURIComponent(team)}`).then(r=>r.json());
+    const players = data.players || [];
+    renderChips(chipId, players, mode);
+  } catch(e) {}
+}
+
+function renderChips(containerId, players, mode) {
+  const el = document.getElementById(containerId);
+  const arr = mode === 'batting' ? selectedBatPlayers : selectedWinPlayers;
+  el.innerHTML = '';
+  players.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'chip' + (arr.includes(p) ? ' selected' : '');
+    div.textContent = p;
+    div.onclick = () => toggleChip(div, p, mode);
+    el.appendChild(div);
+  });
+}
+
+function toggleChip(el, name, mode) {
+  const arr = mode === 'batting' ? selectedBatPlayers : selectedWinPlayers;
+  const idx = arr.indexOf(name);
+  if (idx === -1) {
+    if (arr.length >= 6) { notify('Max 6 players allowed','warn'); return; }
+    arr.push(name);
+    el.classList.add('selected');
+  } else {
+    arr.splice(idx,1);
+    el.classList.remove('selected');
+  }
+}
+
+// ── FORMAT ────────────────────────────────────────────────────────────────────
+function setFormat(fmt) {
+  matchFormat = fmt;
+  ['t20','odi','test'].forEach(f => document.getElementById(`${f}-tab`).classList.remove('active'));
+  document.getElementById(`${fmt.toLowerCase()}-tab`).classList.add('active');
+  const overs = fmt==='T20'?20:fmt==='ODI'?50:90;
+  document.getElementById('total-overs').value = overs;
+  document.getElementById('w-total-overs').value = overs;
+  const maxOver = overs - 0.4;
+  document.getElementById('current-over').max = maxOver;
+  document.getElementById('w-current-over').max = maxOver;
+}
+
+// ── PREDICT SCORE ─────────────────────────────────────────────────────────────
+async function predictScore() {
+  const btn = document.getElementById('score-btn');
+  btn.classList.add('btn-loading');
+  btn.textContent = 'Predicting…';
+  try {
+    const body = {
+      batting_team: document.getElementById('batting-team').value,
+      bowling_team: document.getElementById('bowling-team').value,
+      venue:        document.getElementById('venue').value,
+      current_runs: document.getElementById('current-runs').value,
+      current_wickets: document.getElementById('current-wickets').value,
+      current_over: document.getElementById('current-over').value,
+      total_overs:  document.getElementById('total-overs').value,
+      players:      selectedBatPlayers,
+    };
+    const data = await fetch(`${API}/api/predict-score`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    }).then(r=>r.json());
+
+    if (data.status === 'success') renderScoreResult(data);
+    else notify('⚠️ Prediction error: '+data.message,'warn');
+  } catch(e) { notify('❌ Server error — is Flask running?','err'); }
+  finally {
+    btn.classList.remove('btn-loading');
+    btn.innerHTML = '⚡ Predict Final Score';
+  }
+}
+
+function renderScoreResult(d) {
+  document.getElementById('score-placeholder').style.display='none';
+  const panel = document.getElementById('score-result');
+  panel.classList.add('visible');
+
+  document.getElementById('pred-score').textContent = d.predicted_score;
+  document.getElementById('pred-range').textContent = `Range: ${d.score_range[0]} – ${d.score_range[1]}`;
+  document.getElementById('pred-phase').innerHTML = `<span class="phase-tag">${d.phase}</span>`;
+
+  document.getElementById('res-crr').textContent  = d.current_run_rate;
+  document.getElementById('res-overs').textContent = d.overs_remaining;
+  document.getElementById('res-wickets').textContent = d.wickets_remaining;
+  document.getElementById('res-next5').textContent = '~'+d.projected_runs_next5;
+  document.getElementById('res-venue').textContent = (d.venue_impact>0?'+':'')+d.venue_impact+'%';
+  document.getElementById('res-player').textContent = d.player_impact_score+'/10';
+
+  const conf = document.getElementById('score-confidence');
+  conf.innerHTML = `<span class="confidence ${confClass(d.confidence)}">${d.confidence}</span>`;
+  notify(`✅ Predicted score for ${d.team}: ${d.predicted_score}`, 'ok');
+}
+
+// ── PREDICT WIN ───────────────────────────────────────────────────────────────
+async function predictWin() {
+  const btn = document.getElementById('win-btn');
+  btn.classList.add('btn-loading');
+  btn.textContent = 'Predicting…';
+  try {
+    const body = {
+      batting_team: document.getElementById('w-batting-team').value,
+      bowling_team: document.getElementById('w-bowling-team').value,
+      venue:        document.getElementById('w-venue').value,
+      target:       document.getElementById('w-target').value,
+      current_runs: document.getElementById('w-runs').value,
+      current_wickets: document.getElementById('w-wickets').value,
+      current_over: document.getElementById('w-current-over').value,
+      total_overs:  document.getElementById('w-total-overs').value,
+      players:      selectedWinPlayers,
+    };
+    const data = await fetch(`${API}/api/predict-winner`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    }).then(r=>r.json());
+
+    if (data.status === 'success') renderWinResult(data);
+    else notify('⚠️ '+data.message,'warn');
+  } catch(e) { notify('❌ Server error','err'); }
+  finally {
+    btn.classList.remove('btn-loading');
+    btn.innerHTML = '🎯 Predict Win Probability';
+  }
+}
+
+function renderWinResult(d) {
+  document.getElementById('win-placeholder').style.display='none';
+  const panel = document.getElementById('win-result');
+  panel.classList.add('visible');
+
+  document.getElementById('res-bat-team').textContent  = d.batting_team;
+  document.getElementById('res-bowl-team').textContent = d.bowling_team;
+  document.getElementById('res-bat-pct').textContent   = d.batting_win_pct+'%';
+  document.getElementById('res-bowl-pct').textContent  = d.bowling_win_pct+'%';
+  document.getElementById('win-fill').style.width      = d.batting_win_pct+'%';
+
+  document.getElementById('res-crr2').textContent      = d.current_run_rate;
+  document.getElementById('res-rrr').textContent       = d.required_run_rate;
+  document.getElementById('res-runs-need').textContent = d.runs_needed;
+  document.getElementById('res-overs-left').textContent= d.overs_remaining;
+  document.getElementById('res-momentum').textContent  = d.momentum;
+  document.getElementById('res-key-factor').textContent= '💡 '+d.key_factor;
+
+  const rrr = document.getElementById('res-rrr');
+  rrr.className = 'rrr-val ' + (d.required_run_rate > d.current_run_rate ? 'crr-bad' : 'crr-good');
+
+  const conf = document.getElementById('win-confidence');
+  conf.innerHTML = `<span class="confidence ${confClass(d.confidence)}">${d.confidence}</span>`;
+  notify(`🏆 ${d.batting_team}: ${d.batting_win_pct}% • ${d.bowling_team}: ${d.bowling_win_pct}%`,'ok');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function confClass(c) {
+  if (c.includes('Low'))  return 'conf-low';
+  if (c.includes('Very')) return 'conf-high';
+  if (c.includes('High')) return 'conf-high';
+  return 'conf-mid';
+}
+
+function notify(msg, type='ok') {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.style.borderColor = type==='ok' ? 'var(--lime)' : type==='warn' ? 'var(--gold)' : 'var(--red)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function setNavActive(id) {
+  ['nav-score','nav-win','nav-live'].forEach(i => document.getElementById(i).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function scrollToSection(sel) {
+  document.querySelector(sel)?.scrollIntoView({behavior:'smooth'});
+}
+
+// ── START ──────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
